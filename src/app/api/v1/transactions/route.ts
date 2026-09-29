@@ -52,9 +52,11 @@ export async function POST(request: Request) {
       taxAmount: calculation.taxAmount,
       netAmount: calculation.netAmount,
       status: "UNDER_REVIEW",
-      createdBy: "API User",
+      createdBy: body.createdBy || "API User",
       attachmentsCount: 1,
     };
+
+    INITIAL_TRANSACTIONS.unshift(newTransaction as any);
 
     return NextResponse.json({
       success: true,

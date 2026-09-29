@@ -200,11 +200,11 @@ export const CommandPalette: React.FC = () => {
             </div>
           )}
 
-          {/* PrakTax Services / Layanan Matches */}
+          {/* NatraTax Services / Layanan Matches */}
           {query && filteredServices.length > 0 && (
             <div>
               <p className="px-3 text-[11px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-1.5">
-                Layanan & Fitur PrakTax ({filteredServices.length})
+                Layanan & Fitur NatraTax ({filteredServices.length})
               </p>
               <div className="space-y-1">
                 {filteredServices.slice(0, 8).map((srv, idx) => (

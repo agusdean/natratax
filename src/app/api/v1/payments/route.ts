@@ -53,6 +53,8 @@ export async function POST(request: Request) {
       referenceNote: referenceNote || "Pembuatan Kode Billing Mandiri",
     };
 
+    INITIAL_PAYMENTS.unshift(newPayment as any);
+
     return NextResponse.json({
       success: true,
       message: `Kode Billing ${newPayment.billingCode} berhasil dibuat. Silakan setor ke Bank Persepsi/Pos.`,

@@ -63,17 +63,17 @@ export const TopHeader: React.FC = () => {
         {/* Left Section: Logo, Version, Disclaimer (Matching Screenshot 1-5) */}
         <div className="flex items-center gap-3 shrink-0">
           <Link href="/dashboard" className="flex items-center gap-2 group">
-            {/* PrakTax Brand Logo Typography */}
+            {/* NatraTax Brand Logo Typography */}
             <div className="flex items-baseline">
               <span className="font-extrabold text-2xl italic tracking-tight text-[#1e1b4b] dark:text-purple-300">
-                Prak
+                Natra
               </span>
               <span className="font-black text-2xl tracking-tight text-[#f59e0b] ml-0.5">
                 Tax
               </span>
             </div>
             <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-              Versi 2.0
+              Versi 1.0
             </span>
           </Link>
 
@@ -204,54 +204,55 @@ export const TopHeader: React.FC = () => {
               </div>
               <button
                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-amber-300 dark:border-amber-700/80 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 text-[11px] font-bold hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors shadow-2xs"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-indigo-300 dark:border-indigo-700/80 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-800 dark:text-indigo-300 text-[11px] font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors shadow-2xs"
               >
-                <span>Impersonate</span>
+                <span>Akun</span>
                 <ChevronDown className="w-3 h-3" />
               </button>
             </div>
 
-            {/* User Dropdown with Impersonate / Role Switching */}
+            {/* User Dropdown */}
             {isUserMenuOpen && (
               <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl py-2 z-50 animate-in fade-in zoom-in-95 duration-100">
                 <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-800">
-                  <p className="text-xs text-slate-400 font-medium">Akun Terpilih (Coretax Simulasi)</p>
+                  <p className="text-xs text-slate-400 font-medium">Administrator Terautentikasi</p>
                   <p className="text-sm font-bold text-slate-800 dark:text-white truncate">{currentUser.name}</p>
                   <p className="text-xs text-slate-500 font-mono">{currentUser.taxId}</p>
                   <p className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 mt-0.5">{currentUser.schoolName}</p>
                 </div>
 
-                {/* Role Switcher (Simulasi Impersonate Peran) */}
-                <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800">
-                  <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                    <UserCheck className="w-3.5 h-3.5 text-amber-500" />
-                    Beralih Peran (Simulasi RBAC)
-                  </p>
-                  <div className="grid grid-cols-1 gap-1 max-h-44 overflow-y-auto">
-                    {availableUsers.map((u) => (
-                      <button
-                        key={u.id}
-                        onClick={() => {
-                          switchRole(u.role as UserRole);
-                          setIsUserMenuOpen(false);
-                        }}
-                        className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs flex items-center justify-between transition-colors ${
-                          currentUser.role === u.role
-                            ? "bg-amber-50 dark:bg-amber-950/60 font-bold text-amber-900 dark:text-amber-200 ring-1 ring-amber-300"
-                            : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300"
-                        }`}
-                      >
-                        <div>
-                          <div className="font-bold">{u.name}</div>
-                          <div className="text-[10px] text-slate-400 font-normal">{u.role} • {u.taxId}</div>
-                        </div>
-                        {currentUser.role === u.role && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                        )}
-                      </button>
-                    ))}
+                {availableUsers.length > 1 && (
+                  <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800">
+                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                      <UserCheck className="w-3.5 h-3.5 text-amber-500" />
+                      Pengguna Terdaftar
+                    </p>
+                    <div className="grid grid-cols-1 gap-1 max-h-44 overflow-y-auto">
+                      {availableUsers.map((u) => (
+                        <button
+                          key={u.id}
+                          onClick={() => {
+                            switchRole(u.role as UserRole);
+                            setIsUserMenuOpen(false);
+                          }}
+                          className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs flex items-center justify-between transition-colors ${
+                            currentUser.role === u.role
+                              ? "bg-amber-50 dark:bg-amber-950/60 font-bold text-amber-900 dark:text-amber-200 ring-1 ring-amber-300"
+                              : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300"
+                          }`}
+                        >
+                          <div>
+                            <div className="font-bold">{u.name}</div>
+                            <div className="text-[10px] text-slate-400 font-normal">{u.role} • {u.taxId}</div>
+                          </div>
+                          {currentUser.role === u.role && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div className="py-1">
                   <Link
@@ -318,7 +319,7 @@ export const TopHeader: React.FC = () => {
                   Pemberitahuan & Disclaimer Resmi
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  PrakTax / NatraTax Versi 2.0 • Lingkungan Simulasi Terpadu Coretax
+                  NatraTax Versi 1.0 • Sistem Administrasi Pajak SMK BINA PUTRA JAKARTA
                 </p>
               </div>
             </div>

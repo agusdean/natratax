@@ -76,11 +76,11 @@ export default function LoginPage() {
   };
 
   const handleQuickLoginAdmin = () => {
-    switchRole("BENDAHARA");
+    switchRole("SUPER ADMIN");
     showToast({
       type: "success",
-      title: "Login Admin Berhasil",
-      description: "Masuk sebagai Administrator Perpajakan & Bendahara Sekolah.",
+      title: "Login Administrator Berhasil",
+      description: "Masuk sebagai Administrator Utama Perpajakan & Keuangan Sekolah.",
     });
     router.push("/dashboard");
   };
@@ -236,7 +236,7 @@ export default function LoginPage() {
                   ID: <span className="text-indigo-600 dark:text-indigo-400">998866000010609</span>
                 </p>
                 <p className="text-[11px] text-slate-500">
-                  Sandi: <span className="font-mono font-semibold">Admin123!</span> (Bendahara & WAPU)
+                  Sandi: <span className="font-mono font-semibold">Admin123!</span> (Super Admin & WAPU)
                 </p>
               </div>
               <button

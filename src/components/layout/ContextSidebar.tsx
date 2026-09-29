@@ -2,6 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useApp } from "@/context/AppContext";
 import { 
@@ -314,15 +315,24 @@ const ContextSidebarContent: React.FC = () => {
         </div>
 
         {/* User Identity / NPWP Box */}
-        <div className="rounded-xl p-4 text-white shadow-md relative overflow-hidden bg-[#381750] dark:bg-[#250d36] border border-purple-900/40">
-          <div className="relative z-10">
-            <div className="font-mono font-black text-xs sm:text-sm tracking-wider text-purple-200">
+        <div className="rounded-xl p-3.5 text-white shadow-md relative overflow-hidden bg-[#381750] dark:bg-[#250d36] border border-purple-900/40 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-white p-0.5 shadow-sm ring-2 ring-amber-400 shrink-0 overflow-hidden flex items-center justify-center">
+            <Image
+              src="/images/logo-smk.png"
+              alt="Logo SMK Bina Putra Jakarta"
+              width={40}
+              height={40}
+              className="w-full h-full object-contain rounded-full"
+            />
+          </div>
+          <div className="relative z-10 min-w-0 flex-1">
+            <div className="font-mono font-black text-xs tracking-wider text-purple-200 truncate">
               {currentUser.taxId}
             </div>
-            <div className="font-bold text-xs sm:text-sm tracking-tight mt-0.5 line-clamp-1">
+            <div className="font-bold text-xs tracking-tight mt-0.5 truncate">
               {currentUser.name}
             </div>
-            <div className="text-[10px] font-semibold text-purple-300 uppercase tracking-wide mt-0.5">
+            <div className="text-[10px] font-semibold text-purple-300 uppercase tracking-wide truncate">
               {currentUser.schoolName}
             </div>
           </div>

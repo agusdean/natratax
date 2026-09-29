@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
 import { AppShell } from "@/components/layout/AppShell";
 import { useApp } from "@/context/AppContext";
 import { Building2, ShieldCheck, Mail, MapPin, Phone, Award, School, Edit3, X, Check } from "lucide-react";
@@ -55,8 +56,15 @@ export default function ProfileSekolahPage() {
         {/* Header Profile Banner */}
         <div className="bg-gradient-to-r from-[#381750] via-purple-900 to-indigo-950 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-amber-400 shadow-md">
-              <School className="w-9 h-9" />
+            <div className="w-16 h-16 rounded-full bg-white p-1 ring-2 ring-amber-400 flex items-center justify-center shadow-md overflow-hidden shrink-0">
+              <Image
+                src="/images/logo-smk.png"
+                alt="Logo SMK Bina Putra Jakarta"
+                width={64}
+                height={64}
+                className="w-full h-full object-contain rounded-full"
+                priority
+              />
             </div>
             <div>
               <div className="flex items-center gap-2">

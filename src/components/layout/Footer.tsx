@@ -1,5 +1,6 @@
 import React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { ShieldCheck, FileCheck, HelpCircle } from "lucide-react";
 
 export const Footer: React.FC = () => {
@@ -10,7 +11,16 @@ export const Footer: React.FC = () => {
           
           {/* Brand info */}
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-2 sm:gap-4 text-center sm:text-left">
-            <div>
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-white p-0.5 shadow-xs ring-1 ring-amber-400 shrink-0 overflow-hidden flex items-center justify-center">
+                <Image
+                  src="/images/logo-smk.png"
+                  alt="Logo SMK Bina Putra Jakarta"
+                  width={24}
+                  height={24}
+                  className="w-full h-full object-contain rounded-full"
+                />
+              </div>
               <span className="font-extrabold text-slate-900 dark:text-white tracking-tight text-sm">
                 Natra<span className="text-amber-500">Tax</span>
               </span>

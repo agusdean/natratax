@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useApp } from "@/context/AppContext";
 import { 
   Search, 
@@ -62,7 +63,18 @@ export const TopHeader: React.FC = () => {
         
         {/* Left Section: Logo, Version, Disclaimer (Matching Screenshot 1-5) */}
         <div className="flex items-center gap-3 shrink-0">
-          <Link href="/dashboard" className="flex items-center gap-2 group">
+          <Link href="/dashboard" className="flex items-center gap-2.5 group">
+            {/* Official School Emblem Avatar */}
+            <div className="w-10 h-10 rounded-full bg-white p-0.5 shadow-sm ring-2 ring-amber-400 shrink-0 overflow-hidden flex items-center justify-center group-hover:scale-105 transition-transform">
+              <Image
+                src="/images/logo-smk.png"
+                alt="Logo SMK Bina Putra Jakarta"
+                width={40}
+                height={40}
+                className="w-full h-full object-contain rounded-full"
+                priority
+              />
+            </div>
             {/* NatraTax Brand Logo Typography */}
             <div className="flex items-baseline">
               <span className="font-extrabold text-2xl italic tracking-tight text-[#1e1b4b] dark:text-purple-300">

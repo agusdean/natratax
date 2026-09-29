@@ -17,6 +17,11 @@ export const metadata: Metadata = {
     "NatraTax",
     "SMK Bina Putra Jakarta"
   ],
+  icons: {
+    icon: "/images/logo-smk.png",
+    shortcut: "/images/logo-smk.png",
+    apple: "/images/logo-smk.png",
+  },
 };
 
 export default function RootLayout({

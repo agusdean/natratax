@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/context/AppContext";
 import { UserRole } from "@/types";
@@ -148,9 +149,16 @@ export default function LoginPage() {
           
           <div className="relative z-10">
             {/* Brand Logo Header */}
-            <div className="flex items-center gap-3 mb-8">
-              <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-amber-400 shadow-inner">
-                <ShieldCheck className="w-6 h-6" />
+            <div className="flex items-center gap-3.5 mb-8">
+              <div className="w-12 h-12 rounded-full bg-white p-1 shadow-lg shadow-purple-950/40 ring-2 ring-amber-400 shrink-0 overflow-hidden flex items-center justify-center">
+                <Image
+                  src="/images/logo-smk.png"
+                  alt="Logo SMK Bina Putra Jakarta"
+                  width={48}
+                  height={48}
+                  className="w-full h-full object-contain rounded-full"
+                  priority
+                />
               </div>
               <div>
                 <span className="font-extrabold text-2xl tracking-tight text-white">
@@ -216,13 +224,25 @@ export default function LoginPage() {
         {/* Right Side: Login Form */}
         <div className="lg:col-span-6 p-8 sm:p-10 flex flex-col justify-between">
           <div>
-            <div className="mb-6">
-              <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                Selamat Datang!
-              </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Masuk untuk membuka dan memproses akun perpajakan SMK BINA PUTRA JAKARTA.
-              </p>
+            <div className="mb-6 flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-full bg-white p-1 shadow-md ring-2 ring-amber-400/80 shrink-0 overflow-hidden flex items-center justify-center">
+                <Image
+                  src="/images/logo-smk.png"
+                  alt="Logo SMK Bina Putra Jakarta"
+                  width={48}
+                  height={48}
+                  className="w-full h-full object-contain rounded-full"
+                  priority
+                />
+              </div>
+              <div>
+                <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                  Selamat Datang!
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Masuk untuk membuka dan memproses akun perpajakan SMK BINA PUTRA JAKARTA.
+                </p>
+              </div>
             </div>
 
             {/* Single Admin Credential Badge */}

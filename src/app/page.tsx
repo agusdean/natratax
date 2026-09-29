@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { 
   ShieldCheck, 
   ArrowRight, 
@@ -101,8 +102,15 @@ export default function LandingPage() {
             
             {/* School Brand Identity */}
             <Link href="/" className="flex items-center gap-3 group">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-800 flex items-center justify-center text-amber-300 shadow-lg shadow-purple-900/30 border border-white/20 group-hover:scale-105 transition-transform shrink-0">
-                <ShieldCheck className="w-5 h-5 text-amber-300 shrink-0" />
+              <div className="w-11 h-11 rounded-full bg-white p-1 shadow-lg shadow-purple-900/40 ring-2 ring-amber-400 group-hover:scale-105 transition-transform shrink-0 overflow-hidden flex items-center justify-center">
+                <Image
+                  src="/images/logo-smk.png"
+                  alt="Logo SMK Bina Putra Jakarta"
+                  width={44}
+                  height={44}
+                  className="w-full h-full object-contain rounded-full"
+                  priority
+                />
               </div>
               <div className="flex flex-col">
                 <div className="flex items-center gap-2">
@@ -236,6 +244,23 @@ export default function LandingPage() {
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
           
+          {/* Official School Emblem Avatar (HD Circular Presentation) */}
+          <div className="flex justify-center mb-6">
+            <div className="relative group">
+              <div className="absolute -inset-1.5 bg-gradient-to-r from-amber-400 via-purple-600 to-indigo-600 rounded-full blur-md opacity-75 group-hover:opacity-100 transition duration-500" />
+              <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-white p-2 shadow-2xl ring-4 ring-white/20 flex items-center justify-center overflow-hidden">
+                <Image
+                  src="/images/logo-smk.png"
+                  alt="Logo Resmi SMK Bina Putra Jakarta"
+                  width={112}
+                  height={112}
+                  className="w-full h-full object-contain rounded-full transform group-hover:scale-105 transition-transform"
+                  priority
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Institutional Authority Eyebrow Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-purple-900/60 to-indigo-900/60 border border-purple-500/30 text-purple-200 text-xs font-semibold mb-6 shadow-lg shadow-purple-950/50 backdrop-blur-md">
             <span className="flex h-2 w-2 relative">
@@ -1568,8 +1593,14 @@ export default function LandingPage() {
             {/* Brand Descriptor */}
             <div className="col-span-2 space-y-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-700 flex items-center justify-center text-amber-300 font-bold shrink-0 border border-white/20">
-                  <ShieldCheck className="w-4 h-4 text-amber-300 shrink-0" />
+                <div className="w-9 h-9 rounded-full bg-white p-0.5 shadow-md ring-2 ring-amber-400 shrink-0 overflow-hidden flex items-center justify-center">
+                  <Image
+                    src="/images/logo-smk.png"
+                    alt="Logo SMK Bina Putra Jakarta"
+                    width={36}
+                    height={36}
+                    className="w-full h-full object-contain rounded-full"
+                  />
                 </div>
                 <span className="font-extrabold text-lg text-white tracking-tight">
                   Natra<span className="text-amber-400">Tax</span>

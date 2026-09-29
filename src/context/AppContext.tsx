@@ -4,11 +4,13 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { 
   User, 
   UserRole, 
+  Permission,
   Transaction, 
   Invoice, 
   WithholdingSlip, 
   SptRecord, 
   PaymentRecord, 
+  JournalEntry, 
   AuditLog, 
   SystemNotification,
   Vendor,
@@ -19,7 +21,13 @@ import {
   InvoiceReturn,
   OtherTaxDocument,
   CompensationRecord,
-  GrossRevenueRecord
+  GrossRevenueRecord,
+  OrganizationContext,
+  ReconciliationItem,
+  PracticumBatch,
+  PracticumAssignment,
+  PracticumSubmission,
+  ArchivedDocument,
 } from "@/types";
 import { 
   DEMO_USERS, 
@@ -29,16 +37,24 @@ import {
   INITIAL_SPT, 
   INITIAL_PAYMENTS, 
   INITIAL_AUDIT_LOGS, 
-  INITIAL_NOTIFICATIONS,
-  INITIAL_VENDORS,
-  INITIAL_BANK_ACCOUNTS,
-  INITIAL_SCHOOL_PROFILE,
-  INITIAL_RETURNS,
-  INITIAL_OTHER_DOCS,
-  INITIAL_SERVICE_REQUESTS,
-  INITIAL_COMPENSATIONS,
-  INITIAL_GROSS_REVENUES
+  INITIAL_NOTIFICATIONS, 
+  INITIAL_VENDORS, 
+  INITIAL_BANK_ACCOUNTS, 
+  INITIAL_SCHOOL_PROFILE, 
+  INITIAL_RETURNS, 
+  INITIAL_OTHER_DOCS, 
+  INITIAL_SERVICE_REQUESTS, 
+  INITIAL_COMPENSATIONS, 
+  INITIAL_GROSS_REVENUES,
+  INITIAL_JOURNALS,
+  INITIAL_PRACTICUM_BATCHES,
+  INITIAL_PRACTICUM_ASSIGNMENTS,
+  INITIAL_PRACTICUM_SUBMISSIONS,
+  INITIAL_ARCHIVED_DOCS
 } from "@/lib/store";
+import { TaxCalculationService } from "@/lib/tax-engine";
+import { hasPermission, ROLE_SAMPLE_USERS } from "@/lib/rbac";
+import { INITIAL_ORG_CONTEXT, DEFAULT_UNITS } from "@/lib/org-context";
 
 interface ToastMessage {
   id: string;
@@ -62,15 +78,20 @@ interface AppContextType {
     address?: string;
   }) => User;
   
-  // Period filter
+  // Organization Context & Unit Switcher
+  orgContext: OrganizationContext;
+  switchUnit: (unitId: string) => void;
+  toggleOperatingMode: () => void;
+  setPeriod: (month: number, year: number) => void;
   selectedPeriod: string;
   setSelectedPeriod: (period: string) => void;
 
-  // Compact Mode ("Padatkan" toggle)
+  // RBAC Permission Check
+  hasPermission: (permission: Permission) => boolean;
+
+  // Compact Mode ("Padatkan" toggle) & Theme
   isCompactMode: boolean;
   setIsCompactMode: (compact: boolean) => void;
-
-  // Theme
   isDarkMode: boolean;
   toggleDarkMode: () => void;
 
@@ -80,12 +101,13 @@ interface AppContextType {
   isAiAssistantOpen: boolean;
   setIsAiAssistantOpen: (open: boolean) => void;
 
-  // Data Collections
+  // Data Collections (Single Source of Truth)
   transactions: Transaction[];
   invoices: Invoice[];
   bupotList: WithholdingSlip[];
   sptList: SptRecord[];
   payments: PaymentRecord[];
+  journals: JournalEntry[];
   auditLogs: AuditLog[];
   notifications: SystemNotification[];
   vendors: Vendor[];
@@ -109,12 +131,14 @@ interface AppContextType {
   grossRevenues: GrossRevenueRecord[];
   addGrossRevenue: (record: Omit<GrossRevenueRecord, "id">) => void;
 
-  // Data Operations
+  // Master Flow Operations
   addTransaction: (trx: Omit<Transaction, "id" | "trxNumber" | "createdBy">) => void;
   approveTransaction: (id: string) => void;
   addInvoice: (inv: Omit<Invoice, "id" | "createdBy">) => void;
   addBupot: (bupot: Omit<WithholdingSlip, "id" | "bupotNumber" | "createdBy" | "dateCreated">) => void;
   addSpt: (spt: Omit<SptRecord, "id" | "createdDate" | "createdBy">) => void;
+  postSpt: (taxType: "PPN" | "UNIFIKASI" | "PPH21", month?: number, year?: number) => SptRecord;
+  finalizeSpt: (id: string) => boolean;
   updateSptStatus: (id: string, status: SptRecord["status"]) => void;
   recordPayment: (id: string, ntpn: string, channel: string) => void;
   addPayment: (payment: Omit<PaymentRecord, "id">) => void;
@@ -125,6 +149,21 @@ interface AppContextType {
   markAllNotificationsRead: () => void;
   clearCacheAndReset: () => void;
 
+  // Reconciliation Engine
+  reconcileRecords: () => ReconciliationItem[];
+
+  // Practicum / Instructor Mode
+  practicumBatches: PracticumBatch[];
+  practicumAssignments: PracticumAssignment[];
+  practicumSubmissions: PracticumSubmission[];
+  addPracticumAssignment: (asg: Omit<PracticumAssignment, "id" | "createdAt">) => void;
+  submitPracticum: (assignmentId: string, notes?: string, recordsCount?: number) => void;
+  gradePracticumSubmission: (submissionId: string, score: number, feedback: string) => void;
+
+  // Document Archive
+  archivedDocs: ArchivedDocument[];
+  archiveDocument: (doc: Omit<ArchivedDocument, "id" | "uploadedAt" | "uploadedBy" | "version">) => void;
+
   // Toasts
   toasts: ToastMessage[];
   showToast: (toast: Omit<ToastMessage, "id">) => void;
@@ -134,49 +173,61 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState<User>(DEMO_USERS[0]); // Duwi Heru Santoso, Bendahara
+  const [currentUser, setCurrentUser] = useState<User>(DEMO_USERS[0]);
   const [availableUsers, setAvailableUsers] = useState<User[]>(DEMO_USERS);
   const [vendors, setVendors] = useState<Vendor[]>(INITIAL_VENDORS);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(INITIAL_BANK_ACCOUNTS);
   const [schoolProfile, setSchoolProfile] = useState<SchoolProfile>(INITIAL_SCHOOL_PROFILE);
+  
+  // Organization Context
+  const [orgContext, setOrgContext] = useState<OrganizationContext>(INITIAL_ORG_CONTEXT);
   const [selectedPeriod, setSelectedPeriod] = useState<string>("September-2026");
+
   const [isCompactMode, setIsCompactMode] = useState<boolean>(false);
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
 
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
   const [isAiAssistantOpen, setIsAiAssistantOpen] = useState<boolean>(false);
 
+  // Core Data Collections
   const [transactions, setTransactions] = useState<Transaction[]>(INITIAL_TRANSACTIONS);
   const [invoices, setInvoices] = useState<Invoice[]>(INITIAL_INVOICES);
   const [bupotList, setBupotList] = useState<WithholdingSlip[]>(INITIAL_BUPOT);
   const [sptList, setSptList] = useState<SptRecord[]>(INITIAL_SPT);
   const [payments, setPayments] = useState<PaymentRecord[]>(INITIAL_PAYMENTS);
+  const [journals, setJournals] = useState<JournalEntry[]>(INITIAL_JOURNALS);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(INITIAL_AUDIT_LOGS);
   const [notifications, setNotifications] = useState<SystemNotification[]>(INITIAL_NOTIFICATIONS);
 
+  // Layanan WP, e-Faktur Retur, Dokumen Lain, Kompensasi
   const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>(INITIAL_SERVICE_REQUESTS);
   const [invoiceReturns, setInvoiceReturns] = useState<InvoiceReturn[]>(INITIAL_RETURNS);
   const [otherTaxDocuments, setOtherTaxDocuments] = useState<OtherTaxDocument[]>(INITIAL_OTHER_DOCS);
   const [compensations, setCompensations] = useState<CompensationRecord[]>(INITIAL_COMPENSATIONS);
   const [grossRevenues, setGrossRevenues] = useState<GrossRevenueRecord[]>(INITIAL_GROSS_REVENUES);
 
+  // Practicum & Sandbox
+  const [practicumBatches, setPracticumBatches] = useState<PracticumBatch[]>(INITIAL_PRACTICUM_BATCHES);
+  const [practicumAssignments, setPracticumAssignments] = useState<PracticumAssignment[]>(INITIAL_PRACTICUM_ASSIGNMENTS);
+  const [practicumSubmissions, setPracticumSubmissions] = useState<PracticumSubmission[]>(INITIAL_PRACTICUM_SUBMISSIONS);
+  const [archivedDocs, setArchivedDocs] = useState<ArchivedDocument[]>(INITIAL_ARCHIVED_DOCS);
+
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
-  // Load from localStorage on client side mount with legacy cache cleansing
+  // RBAC Permission Helper
+  const checkPermission = (perm: Permission): boolean => {
+    return hasPermission(currentUser.role, perm);
+  };
+
+  // Load from localStorage on client side mount
   useEffect(() => {
     try {
       const savedUser = localStorage.getItem("natratax_user");
       if (savedUser) {
         const parsed = JSON.parse(savedUser);
-        if (DEMO_USERS.some((u) => u.id === parsed.id)) {
+        if (parsed?.id) {
           setCurrentUser(parsed);
-        } else {
-          // Stale legacy cache detected, purge to keep clean state
-          localStorage.removeItem("natratax_user");
-          setCurrentUser(DEMO_USERS[0]);
         }
-      } else {
-        setCurrentUser(DEMO_USERS[0]);
       }
 
       const savedTheme = localStorage.getItem("natratax_theme");
@@ -188,81 +239,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // LocalStorage access fallback
     }
   }, []);
-
-  const clearCacheAndReset = () => {
-    try {
-      localStorage.removeItem("natratax_user");
-      sessionStorage.clear();
-    } catch {
-      // ignore
-    }
-    setCurrentUser(DEMO_USERS[0]);
-    setAvailableUsers(DEMO_USERS);
-    setVendors(INITIAL_VENDORS);
-    setBankAccounts(INITIAL_BANK_ACCOUNTS);
-    setSchoolProfile(INITIAL_SCHOOL_PROFILE);
-    setTransactions(INITIAL_TRANSACTIONS);
-    setInvoices(INITIAL_INVOICES);
-    setBupotList(INITIAL_BUPOT);
-    setSptList(INITIAL_SPT);
-    setPayments(INITIAL_PAYMENTS);
-    setAuditLogs(INITIAL_AUDIT_LOGS);
-    setNotifications(INITIAL_NOTIFICATIONS);
-    showToast({
-      type: "success",
-      title: "Data Cache Bersih",
-      description: "Seluruh data cache telah direset ke kondisi bersih awal (Clean State).",
-    });
-  };
-
-  const toggleDarkMode = () => {
-    setIsDarkMode((prev) => {
-      const next = !prev;
-      if (next) {
-        document.documentElement.classList.add("dark");
-        localStorage.setItem("natratax_theme", "dark");
-      } else {
-        document.documentElement.classList.remove("dark");
-        localStorage.setItem("natratax_theme", "light");
-      }
-      return next;
-    });
-  };
-
-  const switchRole = (role: UserRole) => {
-    let found = availableUsers.find((u) => u.role === role);
-    if (!found && role === "MITRA") {
-      found = {
-        id: "usr-mitra-demo",
-        name: "Ir. Hendra Kusuma - PT MITRA INDUSTRI KARYA",
-        email: "kemitraan@mitra-industri.co.id",
-        role: "MITRA",
-        taxId: "01.234.567.8-012.000",
-        schoolName: "SMK BINA PUTRA JAKARTA (MITRA REKANAN)",
-        department: "Mitra Industri (DU/DI) & Vokasi",
-        partnerCompany: "PT Mitra Industri Karya",
-        partnerCategory: "Mitra DU/DI (Super Tax Deduction 200%)",
-        partnerPhone: "081298765432",
-      };
-      setAvailableUsers((prev) => [...prev, found!]);
-    } else if (!found) {
-      found = DEMO_USERS[0];
-    }
-
-    setCurrentUser(found);
-    try {
-      localStorage.setItem("natratax_user", JSON.stringify(found));
-    } catch {
-      // ignore
-    }
-
-    logAudit("LOGIN", "AUTH", found.id, `Berganti peran aktif ke ${role} (${found.name})`);
-    showToast({
-      type: "info",
-      title: "Peran Aktif Diperbarui",
-      description: `Beralih ke mode ${role}: ${found.name}`,
-    });
-  };
 
   const showToast = (toast: Omit<ToastMessage, "id">) => {
     const id = Math.random().toString(36).substring(2, 9);
@@ -291,28 +267,257 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setAuditLogs((prev) => [newLog, ...prev]);
   };
 
+  const clearCacheAndReset = () => {
+    try {
+      localStorage.removeItem("natratax_user");
+      sessionStorage.clear();
+    } catch {
+      // ignore
+    }
+    setCurrentUser(DEMO_USERS[0]);
+    setAvailableUsers(DEMO_USERS);
+    setVendors(INITIAL_VENDORS);
+    setBankAccounts(INITIAL_BANK_ACCOUNTS);
+    setSchoolProfile(INITIAL_SCHOOL_PROFILE);
+    setTransactions(INITIAL_TRANSACTIONS);
+    setInvoices(INITIAL_INVOICES);
+    setBupotList(INITIAL_BUPOT);
+    setSptList(INITIAL_SPT);
+    setPayments(INITIAL_PAYMENTS);
+    setJournals(INITIAL_JOURNALS);
+    setAuditLogs(INITIAL_AUDIT_LOGS);
+    setNotifications(INITIAL_NOTIFICATIONS);
+    setOrgContext(INITIAL_ORG_CONTEXT);
+    showToast({
+      type: "success",
+      title: "Data Cache Bersih",
+      description: "Seluruh data cache telah direset ke kondisi bersih awal (Clean State).",
+    });
+  };
+
+  const toggleDarkMode = () => {
+    setIsDarkMode((prev) => {
+      const next = !prev;
+      if (next) {
+        document.documentElement.classList.add("dark");
+        localStorage.setItem("natratax_theme", "dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+        localStorage.setItem("natratax_theme", "light");
+      }
+      return next;
+    });
+  };
+
+  // Unit and Context Switchers
+  const switchUnit = (unitId: string) => {
+    const targetUnit = DEFAULT_UNITS.find((u) => u.id === unitId);
+    if (!targetUnit) return;
+    setOrgContext((prev) => ({
+      ...prev,
+      unitId: targetUnit.id,
+      unitName: targetUnit.name,
+    }));
+    logAudit("UPDATE", "ORGANISASI", targetUnit.id, `Beralih ke unit aktif: ${targetUnit.name}`);
+    showToast({
+      type: "info",
+      title: "Unit Aktif Diperbarui",
+      description: `Beralih ke unit: ${targetUnit.name}`,
+    });
+  };
+
+  const toggleOperatingMode = () => {
+    setOrgContext((prev) => {
+      const nextMode = prev.operatingMode === "LIVE_INTERNAL" ? "PRACTICUM_SANDBOX" : "LIVE_INTERNAL";
+      logAudit("UPDATE", "SYSTEM", nextMode, `Beralih ke mode operasional: ${nextMode}`);
+      showToast({
+        type: nextMode === "PRACTICUM_SANDBOX" ? "warning" : "info",
+        title: nextMode === "PRACTICUM_SANDBOX" ? "Mode Praktikum / Sandbox Aktif" : "Mode Operasional Nyata Aktif",
+        description: nextMode === "PRACTICUM_SANDBOX" 
+          ? "Data transaksi terisolasi dalam sandbox latihan siswa." 
+          : "Kembali ke data penatausahaan riil sekolah.",
+      });
+      return { ...prev, operatingMode: nextMode };
+    });
+  };
+
+  const setPeriod = (month: number, year: number) => {
+    const monthNames = [
+      "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+      "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+    ];
+    const label = `${monthNames[month - 1]} ${year}`;
+    setOrgContext((prev) => ({
+      ...prev,
+      periodMonth: month,
+      periodYear: year,
+      periodLabel: label,
+      fiscalYear: String(year),
+    }));
+    setSelectedPeriod(`${monthNames[month - 1]}-${year}`);
+    showToast({
+      type: "info",
+      title: "Masa Pajak Aktif",
+      description: `Periode pelaporan diubah ke ${label}`,
+    });
+  };
+
+  // Role Switching with Pre-configured Sample Users
+  const switchRole = (role: UserRole) => {
+    let found = availableUsers.find((u) => u.role === role);
+    if (!found) {
+      const sample = ROLE_SAMPLE_USERS[role];
+      if (sample) {
+        found = {
+          ...sample,
+          id: `usr-${role.toLowerCase().replace(/\s+/g, "-")}-${Date.now()}`,
+        };
+        setAvailableUsers((prev) => [...prev, found!]);
+      } else {
+        found = DEMO_USERS[0];
+      }
+    }
+
+    setCurrentUser(found);
+    try {
+      localStorage.setItem("natratax_user", JSON.stringify(found));
+    } catch {
+      // ignore
+    }
+
+    logAudit("LOGIN", "AUTH", found.id, `Berganti peran aktif ke ${role} (${found.name})`);
+    showToast({
+      type: "info",
+      title: "Peran Aktif Diperbarui",
+      description: `Beralih ke ${role}: ${found.name}`,
+    });
+  };
+
+  // Master Flow 1: ADD TRANSACTION with Deterministic Tax Engine & Cross-Module Auto-Generation
   const addTransaction = (trx: Omit<Transaction, "id" | "trxNumber" | "createdBy">) => {
     const id = "trx-" + Date.now();
-    const trxNumber = `TRX-BP-2026-09-${String(transactions.length + 1).padStart(3, "0")}`;
+    const trxNumber = `TRX-BP-${orgContext.fiscalYear}-${String(orgContext.periodMonth).padStart(2, "0")}-${String(transactions.length + 1).padStart(3, "0")}`;
+    
+    // Calculate deterministic tax using centralized Tax Engine
+    let calcResult;
+    try {
+      calcResult = TaxCalculationService.calculate({
+        taxType: trx.taxType,
+        grossAmount: trx.grossAmount,
+        hasNpwp: true,
+        transactionDate: trx.date,
+        taxObjectCode: trx.taxObjectCode,
+      });
+    } catch (err: any) {
+      showToast({
+        type: "error",
+        title: "Perhitungan Pajak Gagal",
+        description: err?.message || "Tidak dapat memvalidasi aturan pajak transaksi.",
+      });
+      return;
+    }
+
     const newTrx: Transaction = {
       ...trx,
       id,
       trxNumber,
+      taxBase: calcResult.taxBase,
+      taxRate: calcResult.effectiveRate,
+      taxAmount: calcResult.taxAmount,
+      netAmount: calcResult.netAmount,
+      taxObjectCode: calcResult.taxObjectCode,
+      organizationId: orgContext.organizationId,
+      unitId: orgContext.unitId,
+      periodId: selectedPeriod,
+      operatingMode: orgContext.operatingMode,
       createdBy: currentUser.name,
     };
+
     setTransactions((prev) => [newTrx, ...prev]);
-    logAudit("CREATE", "TRANSAKSI", trxNumber, `Menambahkan transaksi ${newTrx.categoryName} senilai Rp ${newTrx.grossAmount.toLocaleString("id-ID")}`);
+
+    // Data Lineage: Auto-generate Tax Document based on transaction type
+    if (newTrx.taxType === "PPN") {
+      const isOutgoing = newTrx.type === "OPERASIONAL" || newTrx.type === "SEWA_GEDUNG";
+      const invoiceNumber = `INV-${isOutgoing ? "OUT" : "IN"}-${Date.now().toString().slice(-6)}`;
+      const newInvoice: Invoice = {
+        id: "inv-" + Date.now(),
+        invoiceNumber,
+        taxInvoiceNumber: `0${isOutgoing ? "10" : "01"}.000-26.${String(Date.now()).slice(-8)}`,
+        type: isOutgoing ? "KELUARAN" : "MASUKAN",
+        date: newTrx.date,
+        counterpartyName: newTrx.vendorName,
+        counterpartyNpwp: newTrx.vendorNpwp,
+        dpp: newTrx.taxBase,
+        ppnRate: newTrx.taxRate,
+        ppnAmount: newTrx.taxAmount,
+        total: newTrx.grossAmount,
+        status: "DRAFT",
+        createdBy: currentUser.name,
+        period: `${String(orgContext.periodMonth).padStart(2, "0")}-${orgContext.periodYear}`,
+        isCreditable: true,
+        sourceTransactionId: id,
+        organizationId: orgContext.organizationId,
+        unitId: orgContext.unitId,
+        operatingMode: orgContext.operatingMode,
+      };
+      setInvoices((prev) => [newInvoice, ...prev]);
+    } else if (newTrx.taxAmount > 0) {
+      let bType: WithholdingSlip["bupotType"] = "BPPU";
+      if (newTrx.taxType === "PPH21") bType = "BP21";
+      else if (newTrx.taxType === "PPH4_2") bType = "BP4_2";
+
+      const bupotNumber = `BP-${newTrx.taxType}-${orgContext.fiscalYear}-${String(bupotList.length + 1).padStart(4, "0")}`;
+      const newBupot: WithholdingSlip = {
+        id: "bupot-" + Date.now(),
+        bupotNumber,
+        bupotType: bType,
+        taxType: newTrx.taxType,
+        taxObjectCode: newTrx.taxObjectCode || "GENERIC",
+        objectDescription: newTrx.description,
+        beneficiaryName: newTrx.vendorName,
+        beneficiaryNpwpNik: newTrx.vendorNpwp,
+        grossAmount: newTrx.grossAmount,
+        effectiveRate: newTrx.taxRate,
+        taxWithheld: newTrx.taxAmount,
+        periodMonth: orgContext.periodMonth,
+        periodYear: orgContext.periodYear,
+        status: "DRAFT",
+        dateCreated: newTrx.date,
+        createdBy: currentUser.name,
+        sourceTransactionId: id,
+        organizationId: orgContext.organizationId,
+        unitId: orgContext.unitId,
+        operatingMode: orgContext.operatingMode,
+      };
+      setBupotList((prev) => [newBupot, ...prev]);
+    }
+
+    // Ledger Integration: Auto-record double-entry transaction
+    const journalId = "jrn-" + Date.now();
+    const newJournal: JournalEntry = {
+      id: journalId,
+      date: newTrx.date,
+      refNumber: trxNumber,
+      accountCode: "5.1.02.01",
+      accountName: `Beban ${newTrx.categoryName} (${orgContext.unitName})`,
+      description: `${newTrx.description} - Rekanan: ${newTrx.vendorName}`,
+      debit: newTrx.grossAmount,
+      credit: newTrx.grossAmount,
+      taxRef: `${newTrx.taxType} (Rp ${newTrx.taxAmount.toLocaleString("id-ID")})`,
+    };
+    setJournals((prev) => [newJournal, ...prev]);
+
+    logAudit("CREATE", "TRANSAKSI", trxNumber, `Input transaksi ${newTrx.categoryName} Rp ${newTrx.grossAmount.toLocaleString("id-ID")} (${newTrx.taxType})`);
     showToast({
       type: "success",
-      title: "Transaksi Berhasil Ditambahkan",
-      description: `Nomor: ${trxNumber} dengan status ${newTrx.status}`,
+      title: "Transaksi & Dokumen Pajak Dibuat",
+      description: `${trxNumber} berhasil direkam ke e-Faktur/e-Bupot & Buku Kas.`,
     });
   };
 
+  // Master Flow 2: APPROVE TRANSACTION with Segregation of Duties & Auto-Issue
   const approveTransaction = (id: string) => {
-    // 1. RBAC Check: Only authorized roles can approve
-    const authorizedRoles: UserRole[] = ["SUPER ADMIN", "KEPALA SEKOLAH", "BENDAHARA", "VERIFIKATOR"];
-    if (!authorizedRoles.includes(currentUser.role)) {
+    if (!checkPermission("transaction.approve")) {
       showToast({
         type: "error",
         title: "Akses Otorisasi Ditolak",
@@ -327,7 +532,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
 
-    // 2. Status Machine Check: Block illegal transitions (e.g. CANCELLED -> APPROVED)
     if (target.status === "CANCELLED" || target.status === "PAID") {
       showToast({
         type: "warning",
@@ -337,7 +541,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
 
-    // 3. Segregation of Duties / Self-Approval Prevention
     if (target.createdBy === currentUser.name && currentUser.role !== "SUPER ADMIN" && currentUser.role !== "KEPALA SEKOLAH") {
       showToast({
         type: "warning",
@@ -347,23 +550,492 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
 
+    // Update Transaction status to APPROVED
     setTransactions((prev) =>
       prev.map((t) => (t.id === id ? { ...t, status: "APPROVED" } : t))
     );
-    logAudit("APPROVE", "TRANSAKSI", target.trxNumber, `Menyetujui transaksi ${target.trxNumber} oleh ${currentUser.name} (${currentUser.role})`);
+
+    // Auto-issue linked Invoice (lock into TERBIT)
+    setInvoices((prev) =>
+      prev.map((inv) => inv.sourceTransactionId === id ? { ...inv, status: "TERBIT" } : inv)
+    );
+
+    // Auto-issue linked Bupot (lock into TERBIT with verified signature)
+    setBupotList((prev) =>
+      prev.map((b) => b.sourceTransactionId === id ? { 
+        ...b, 
+        status: "TERBIT", 
+        signatureVerified: true, 
+        signerName: currentUser.name, 
+        signerNpwp: currentUser.taxId 
+      } : b)
+    );
+
+    logAudit("APPROVE", "TRANSAKSI", target.trxNumber, `Menyetujui transaksi ${target.trxNumber} & menerbitkan dokumen pajak terkait`);
     showToast({
       type: "success",
-      title: "Transaksi Disetujui",
-      description: `${target.trxNumber} berhasil diverifikasi dan disetujui untuk proses pembayaran.`,
+      title: "Transaksi & Dokumen Pajak Disetujui",
+      description: `${target.trxNumber} disetujui. Dokumen e-Faktur/e-Bupot otomatis diterbitkan (TERBIT).`,
     });
   };
 
+  // Master Flow 3: POST SPT (Auto-Aggregation from Source Records without duplicate entry)
+  const postSpt = (taxType: "PPN" | "UNIFIKASI" | "PPH21", month?: number, year?: number): SptRecord => {
+    const targetMonth = month || orgContext.periodMonth;
+    const targetYear = year || orgContext.periodYear;
+    const periodLabel = `${orgContext.periodLabel}`;
+
+    let totalDpp = 0;
+    let totalTax = 0;
+    let taxOutput = 0;
+    let creditableInput = 0;
+    let taxPosition: SptRecord["taxPosition"] = "NIHIL";
+    let sourceInvoiceIds: string[] = [];
+    let sourceBupotIds: string[] = [];
+    let sourceTransactionIds: string[] = [];
+
+    if (taxType === "PPN") {
+      const activeInvoices = invoices.filter(
+        (inv) => inv.status === "TERBIT" && inv.operatingMode === orgContext.operatingMode
+      );
+      sourceInvoiceIds = activeInvoices.map((inv) => inv.id);
+
+      const keluaran = activeInvoices.filter((inv) => inv.type === "KELUARAN");
+      const masukan = activeInvoices.filter((inv) => inv.type === "MASUKAN" && inv.isCreditable !== false);
+
+      taxOutput = keluaran.reduce((sum, inv) => sum + inv.ppnAmount, 0);
+      creditableInput = masukan.reduce((sum, inv) => sum + inv.ppnAmount, 0);
+      totalDpp = activeInvoices.reduce((sum, inv) => sum + inv.dpp, 0);
+
+      const netPpn = taxOutput - creditableInput;
+      if (netPpn > 0) {
+        taxPosition = "KURANG_BAYAR";
+        totalTax = netPpn;
+      } else if (netPpn < 0) {
+        taxPosition = "LEBIH_BAYAR";
+        totalTax = Math.abs(netPpn);
+      } else {
+        taxPosition = "NIHIL";
+        totalTax = 0;
+      }
+    } else if (taxType === "UNIFIKASI") {
+      const activeBupots = bupotList.filter(
+        (b) => b.status === "TERBIT" && (b.bupotType === "BPPU" || b.bupotType === "BPNR" || b.bupotType === "BP4_2") &&
+               b.operatingMode === orgContext.operatingMode
+      );
+      sourceBupotIds = activeBupots.map((b) => b.id);
+      totalDpp = activeBupots.reduce((sum, b) => sum + b.grossAmount, 0);
+      totalTax = activeBupots.reduce((sum, b) => sum + b.taxWithheld, 0);
+      taxPosition = totalTax > 0 ? "KURANG_BAYAR" : "NIHIL";
+    } else if (taxType === "PPH21") {
+      const activeBupots = bupotList.filter(
+        (b) => b.status === "TERBIT" && (b.bupotType === "BP21" || b.bupotType === "BP_A1" || b.bupotType === "BP_A2") &&
+               b.operatingMode === orgContext.operatingMode
+      );
+      sourceBupotIds = activeBupots.map((b) => b.id);
+      totalDpp = activeBupots.reduce((sum, b) => sum + b.grossAmount, 0);
+      totalTax = activeBupots.reduce((sum, b) => sum + b.taxWithheld, 0);
+      taxPosition = totalTax > 0 ? "KURANG_BAYAR" : "NIHIL";
+    }
+
+    const sptTitle = taxType === "PPN" ? "SPT Masa PPN 1107 PUT" : taxType === "UNIFIKASI" ? "SPT Masa Unifikasi" : "SPT Masa PPh 21/26";
+    const existingIndex = sptList.findIndex((s) => s.taxType === sptTitle && s.periodMonth === targetMonth && s.periodYear === targetYear);
+    
+    const billingCode = taxPosition === "KURANG_BAYAR" ? `BIL-${taxType}-${targetYear}${String(targetMonth).padStart(2, "0")}-${String(Date.now()).slice(-4)}` : undefined;
+
+    const newSpt: SptRecord = {
+      id: existingIndex >= 0 ? sptList[existingIndex].id : "spt-" + Date.now(),
+      taxType: sptTitle,
+      sptCategory: "MASA",
+      taxPeriod: periodLabel,
+      periodMonth: targetMonth,
+      periodYear: targetYear,
+      totalDpp,
+      totalTax,
+      taxOutput,
+      creditableInput,
+      taxPosition,
+      status: taxPosition === "KURANG_BAYAR" ? "PAYMENT_REQUIRED" : "READY_TO_FINALIZE",
+      createdDate: new Date().toISOString().split("T")[0],
+      createdBy: currentUser.name,
+      billingCode,
+      sourceInvoiceIds,
+      sourceBupotIds,
+      sourceTransactionIds,
+      organizationId: orgContext.organizationId,
+      unitId: orgContext.unitId,
+      operatingMode: orgContext.operatingMode,
+    };
+
+    if (existingIndex >= 0) {
+      setSptList((prev) => prev.map((s, idx) => idx === existingIndex ? newSpt : s));
+    } else {
+      setSptList((prev) => [newSpt, ...prev]);
+    }
+
+    // Auto-generate Billing in payments module if Kurang Bayar
+    if (taxPosition === "KURANG_BAYAR" && billingCode) {
+      const newPayment: PaymentRecord = {
+        id: "pay-" + Date.now(),
+        billingCode,
+        taxType: sptTitle,
+        period: periodLabel,
+        amount: totalTax,
+        dueDate: `${targetYear}-${String(targetMonth + 1).padStart(2, "0")}-10`,
+        status: "PENDING",
+        referenceNote: `Tagihan Setoran SPT Masa ${sptTitle} Periode ${periodLabel}`,
+      };
+      setPayments((prev) => [newPayment, ...prev]);
+    }
+
+    logAudit("CREATE", "SPT", sptTitle, `Posting agregasi otomatis ${sptTitle} Periode ${periodLabel} total pajak Rp ${totalTax.toLocaleString("id-ID")}`);
+    showToast({
+      type: "success",
+      title: "SPT Berhasil Diposting",
+      description: `${sptTitle} teragregasi otomatis dari ${sourceInvoiceIds.length + sourceBupotIds.length} dokumen sumber. Posisi: ${taxPosition}.`,
+    });
+
+    return newSpt;
+  };
+
+  // Master Flow 4: FINALIZE SPT with Checklist Validation & Immutable Snapshot
+  const finalizeSpt = (id: string): boolean => {
+    if (!checkPermission("spt.finalize")) {
+      showToast({
+        type: "error",
+        title: "Akses Finalisasi Ditolak",
+        description: `Peran ${currentUser.role} tidak memiliki kewenangan finalisasi SPT.`,
+      });
+      return false;
+    }
+
+    const target = sptList.find((s) => s.id === id);
+    if (!target) {
+      showToast({ type: "error", title: "SPT Tidak Ditemukan", description: `ID: ${id}` });
+      return false;
+    }
+
+    if (target.status === "FINALIZED" || target.status === "LOCKED") {
+      showToast({
+        type: "warning",
+        title: "SPT Sudah Difinalisasi",
+        description: "Dokumen SPT yang telah difinalisasi bersifat permanen dan tidak dapat diubah.",
+      });
+      return false;
+    }
+
+    // Finalization Checklist: Check payment requirement
+    if (target.taxPosition === "KURANG_BAYAR" && !target.ntpn) {
+      const linkedPayment = payments.find((p) => p.billingCode === target.billingCode && p.status === "PAID");
+      if (!linkedPayment) {
+        showToast({
+          type: "warning",
+          title: "Pembayaran Belum Divalidasi",
+          description: `SPT berposisi Kurang Bayar (Rp ${target.totalTax.toLocaleString("id-ID")}). Silakan lunasi kode billing ${target.billingCode} terlebih dahulu.`,
+        });
+        return false;
+      }
+    }
+
+    // Create immutable snapshot of the SPT state
+    const snapshot = JSON.stringify({
+      sptId: target.id,
+      taxType: target.taxType,
+      period: target.taxPeriod,
+      totalDpp: target.totalDpp,
+      totalTax: target.totalTax,
+      taxPosition: target.taxPosition,
+      sourceInvoiceIds: target.sourceInvoiceIds,
+      sourceBupotIds: target.sourceBupotIds,
+      finalizedBy: currentUser.name,
+      finalizedAt: new Date().toISOString(),
+      schoolNpwp: schoolProfile.taxId,
+      schoolName: schoolProfile.name,
+    });
+
+    setSptList((prev) =>
+      prev.map((s) => s.id === id ? {
+        ...s,
+        status: "FINALIZED",
+        finalizedAt: new Date().toISOString(),
+        finalizedBy: currentUser.name,
+        snapshotData: snapshot,
+      } : s)
+    );
+
+    logAudit("APPROVE", "SPT", target.taxType, `Finalisasi resmi & penguncian arsip SPT Masa ${target.taxType} periode ${target.taxPeriod}`);
+    showToast({
+      type: "success",
+      title: "SPT Berhasil Difinalisasi & Dikunci",
+      description: `Snapshot digital terbentuk. Status: FINALIZED (Arsip Sah Satuan Pendidikan).`,
+    });
+
+    return true;
+  };
+
+  // Master Flow 5: RECORD PAYMENT with NTPN Verification & Automatic Ledger Update
+  const recordPayment = (id: string, ntpn: string, channel: string) => {
+    if (!checkPermission("payment.verify")) {
+      showToast({
+        type: "error",
+        title: "Akses Ditolak",
+        description: "Hanya Verifikator, Bendahara, atau Admin yang dapat memverifikasi bukti setoran pajak.",
+      });
+      return;
+    }
+
+    // NTPN validation (16 alphanumeric chars)
+    const cleanNtpn = ntpn.trim().toUpperCase();
+    if (cleanNtpn.length < 16) {
+      showToast({
+        type: "error",
+        title: "Format NTPN Tidak Sah",
+        description: "Nomor Transaksi Penerimaan Negara (NTPN) wajib memiliki minimal 16 digit alfanumerik resmi kas negara.",
+      });
+      return;
+    }
+
+    // Duplicate NTPN check
+    const isDuplicate = payments.some((p) => p.ntpn === cleanNtpn && p.id !== id);
+    if (isDuplicate) {
+      showToast({
+        type: "error",
+        title: "Duplikasi NTPN Terdeteksi",
+        description: `NTPN ${cleanNtpn} sudah pernah dicatat dalam sistem sebelumnya. Penyetoran ganda ditolak.`,
+      });
+      return;
+    }
+
+    const targetPayment = payments.find((p) => p.id === id);
+    if (!targetPayment) return;
+
+    setPayments((prev) =>
+      prev.map((p) =>
+        p.id === id
+          ? {
+              ...p,
+              status: "PAID",
+              ntpn: cleanNtpn,
+              paymentChannel: channel,
+              paymentDate: new Date().toISOString().split("T")[0],
+            }
+          : p
+      )
+    );
+
+    // Update corresponding SPT status to DILAPORKAN / READY_TO_REPORT with NTPN
+    if (targetPayment.billingCode) {
+      setSptList((prev) =>
+        prev.map((s) => s.billingCode === targetPayment.billingCode ? {
+          ...s,
+          ntpn: cleanNtpn,
+          status: "DILAPORKAN",
+        } : s)
+      );
+    }
+
+    // Ledger Integration: Record Debit Utang Pajak, Credit Kas Bank BOS
+    const newJournal: JournalEntry = {
+      id: "jrn-pay-" + Date.now(),
+      date: new Date().toISOString().split("T")[0],
+      refNumber: cleanNtpn,
+      accountCode: "2.1.01.01",
+      accountName: "Utang Pajak Kas Negara (NTPN Validasi)",
+      description: `Penyetoran Kas Negara ${targetPayment.taxType} NTPN: ${cleanNtpn} via ${channel}`,
+      debit: targetPayment.amount,
+      credit: targetPayment.amount,
+      taxRef: targetPayment.billingCode,
+    };
+    setJournals((prev) => [newJournal, ...prev]);
+
+    logAudit("PAYMENT", "PEMBAYARAN", targetPayment.billingCode, `Penyetoran lunas NTPN: ${cleanNtpn} senilai Rp ${targetPayment.amount.toLocaleString("id-ID")}`);
+    showToast({
+      type: "success",
+      title: "Setoran Pajak Tervalidasi Kas Negara",
+      description: `Billing ${targetPayment.billingCode} lunas dengan NTPN ${cleanNtpn}. Buku Besar & SPT otomatis terupdate.`,
+    });
+  };
+
+  // Reconciliation Engine (Cross-checks Transactions, Tax Documents, SPT, Payments, Ledger)
+  const reconcileRecords = (): ReconciliationItem[] => {
+    const items: ReconciliationItem[] = [];
+
+    // 1. Transactions vs Tax Documents
+    transactions.forEach((trx) => {
+      let matchedAmount = 0;
+      let status: ReconciliationItem["status"] = "MATCHED";
+      let discrepancyType: ReconciliationItem["discrepancyType"];
+      let notes = "Transaksi dan dokumen pajak telah sesuai.";
+
+      if (trx.taxType === "PPN") {
+        const inv = invoices.find((i) => i.sourceTransactionId === trx.id);
+        if (!inv) {
+          status = "MISMATCH";
+          discrepancyType = "MISSING_RECORD";
+          notes = "Faktur PPN belum diterbitkan untuk transaksi ini.";
+        } else {
+          matchedAmount = inv.total;
+          if (inv.total !== trx.grossAmount) {
+            status = "MISMATCH";
+            discrepancyType = "AMOUNT_MISMATCH";
+            notes = `Selisih nilai transaksi (Rp ${trx.grossAmount}) vs Faktur (Rp ${inv.total}).`;
+          } else if (inv.status === "DRAFT") {
+            status = "NEEDS_REVIEW";
+            notes = "Faktur masih berstatus Draft, menunggu approval.";
+          }
+        }
+      } else if (trx.taxAmount > 0) {
+        const bp = bupotList.find((b) => b.sourceTransactionId === trx.id);
+        if (!bp) {
+          status = "MISMATCH";
+          discrepancyType = "MISSING_RECORD";
+          notes = "Bukti Potong belum diterbitkan.";
+        } else {
+          matchedAmount = bp.grossAmount;
+          if (bp.grossAmount !== trx.grossAmount) {
+            status = "MISMATCH";
+            discrepancyType = "AMOUNT_MISMATCH";
+            notes = "Nilai bruto transaksi tidak cocok dengan Bukti Potong.";
+          } else if (bp.status === "DRAFT") {
+            status = "NEEDS_REVIEW";
+            notes = "Bukti Potong menunggu verifikasi tanda tangan.";
+          }
+        }
+      } else {
+        matchedAmount = trx.grossAmount;
+      }
+
+      items.push({
+        id: "rec-trx-" + trx.id,
+        entityType: "TRANSACTION",
+        referenceNumber: trx.trxNumber,
+        date: trx.date,
+        period: trx.periodId || selectedPeriod,
+        sourceAmount: trx.grossAmount,
+        matchedAmount,
+        difference: Math.abs(trx.grossAmount - matchedAmount),
+        status,
+        discrepancyType,
+        notes,
+      });
+    });
+
+    // 2. SPT vs Payments
+    sptList.forEach((spt) => {
+      if (spt.taxPosition === "KURANG_BAYAR") {
+        const payment = payments.find((p) => p.billingCode === spt.billingCode);
+        let status: ReconciliationItem["status"] = "MATCHED";
+        let notes = "Kewajiban pajak telah disetor penuh.";
+
+        if (!payment) {
+          status = "UNRESOLVED";
+          notes = "Kode billing belum dibentuk untuk SPT Kurang Bayar ini.";
+        } else if (payment.status !== "PAID") {
+          status = "NEEDS_REVIEW";
+          notes = `Menunggu penyetoran kode billing ${payment.billingCode}.`;
+        }
+
+        items.push({
+          id: "rec-spt-" + spt.id,
+          entityType: "SPT",
+          referenceNumber: spt.taxType,
+          date: spt.createdDate,
+          period: spt.taxPeriod,
+          sourceAmount: spt.totalTax,
+          matchedAmount: payment?.status === "PAID" ? payment.amount : 0,
+          difference: payment?.status === "PAID" ? 0 : spt.totalTax,
+          status,
+          discrepancyType: payment?.status !== "PAID" ? "PAYMENT_MISMATCH" : undefined,
+          notes,
+        });
+      }
+    });
+
+    return items;
+  };
+
+  // Practicum Actions
+  const addPracticumAssignment = (asg: Omit<PracticumAssignment, "id" | "createdAt">) => {
+    const newAsg: PracticumAssignment = {
+      ...asg,
+      id: "asg-" + Date.now(),
+      createdAt: new Date().toISOString().split("T")[0],
+    };
+    setPracticumAssignments((prev) => [newAsg, ...prev]);
+    logAudit("CREATE", "PRAKTIKUM", newAsg.title, `Instruktur menambahkan tugas praktikum baru`);
+    showToast({
+      type: "success",
+      title: "Tugas Praktikum Diterbitkan",
+      description: `${newAsg.title} aktif untuk kelas peserta.`,
+    });
+  };
+
+  const submitPracticum = (assignmentId: string, notes?: string, recordsCount: number = 1) => {
+    const targetAsg = practicumAssignments.find((a) => a.id === assignmentId);
+    const newSub: PracticumSubmission = {
+      id: "sub-" + Date.now(),
+      assignmentId,
+      studentId: currentUser.id,
+      studentName: currentUser.name,
+      submissionDate: new Date().toISOString().split("T")[0],
+      status: "SUBMITTED",
+      notes: notes || "Tugas diselesaikan dengan input transaksi dan e-Bupot/SPT di mode sandbox.",
+      submittedRecordsCount: recordsCount,
+    };
+    setPracticumSubmissions((prev) => [newSub, ...prev]);
+    logAudit("CREATE", "PRAKTIKUM", targetAsg?.title || assignmentId, `Siswa menyerahkan jawaban praktikum perpajakan`);
+    showToast({
+      type: "success",
+      title: "Tugas Berhasil Dikirimkan",
+      description: `Jawaban praktikum telah dikirimkan ke instruktur untuk dinilai.`,
+    });
+  };
+
+  const gradePracticumSubmission = (submissionId: string, score: number, feedback: string) => {
+    setPracticumSubmissions((prev) =>
+      prev.map((s) => s.id === submissionId ? {
+        ...s,
+        status: "GRADED",
+        score,
+        feedback,
+      } : s)
+    );
+    logAudit("UPDATE", "PRAKTIKUM", submissionId, `Instruktur memberikan nilai ${score}/100`);
+    showToast({
+      type: "success",
+      title: "Penilaian Berhasil Disimpan",
+      description: `Nilai: ${score}/100 beserta feedback telah dikirimkan ke siswa.`,
+    });
+  };
+
+  // Document Archive Action
+  const archiveDocument = (doc: Omit<ArchivedDocument, "id" | "uploadedAt" | "uploadedBy" | "version">) => {
+    const newDoc: ArchivedDocument = {
+      ...doc,
+      id: "arch-" + Date.now(),
+      version: 1,
+      uploadedAt: new Date().toISOString().replace("T", " ").substring(0, 16),
+      uploadedBy: currentUser.name,
+    };
+    setArchivedDocs((prev) => [newDoc, ...prev]);
+    logAudit("CREATE", "DOKUMEN", newDoc.referenceNumber, `Mengarsipkan dokumen ${newDoc.title} (${newDoc.category})`);
+    showToast({
+      type: "success",
+      title: "Dokumen Berhasil Diarsipkan",
+      description: `${newDoc.title} tersimpan aman di repositori arsip resmi.`,
+    });
+  };
+
+  // Additional Support Functions
   const addInvoice = (inv: Omit<Invoice, "id" | "createdBy">) => {
     const id = "inv-" + Date.now();
     const newInvoice: Invoice = {
       ...inv,
       id,
       createdBy: currentUser.name,
+      organizationId: orgContext.organizationId,
+      unitId: orgContext.unitId,
+      operatingMode: orgContext.operatingMode,
     };
     setInvoices((prev) => [newInvoice, ...prev]);
     logAudit("CREATE", "E-FAKTUR", newInvoice.invoiceNumber, `Menerbitkan faktur ${newInvoice.taxInvoiceNumber} sebesar Rp ${newInvoice.total.toLocaleString("id-ID")}`);
@@ -376,13 +1048,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const addBupot = (bupot: Omit<WithholdingSlip, "id" | "bupotNumber" | "createdBy" | "dateCreated">) => {
     const id = "bupot-" + Date.now();
-    const bupotNumber = `BP-${bupot.taxType}-2026-09-${String(bupotList.length + 1).padStart(4, "0")}`;
+    const bupotNumber = `BP-${bupot.taxType}-${orgContext.fiscalYear}-${String(bupotList.length + 1).padStart(4, "0")}`;
     const newBupot: WithholdingSlip = {
       ...bupot,
       id,
       bupotNumber,
       createdBy: currentUser.name,
       dateCreated: new Date().toISOString().split("T")[0],
+      organizationId: orgContext.organizationId,
+      unitId: orgContext.unitId,
+      operatingMode: orgContext.operatingMode,
     };
     setBupotList((prev) => [newBupot, ...prev]);
     logAudit("CREATE", "E-BUPOT", bupotNumber, `Membuat Bukti Potong atas nama ${newBupot.beneficiaryName} senilai Rp ${newBupot.taxWithheld.toLocaleString("id-ID")}`);
@@ -400,6 +1075,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id,
       createdDate: new Date().toISOString().split("T")[0],
       createdBy: currentUser.name,
+      organizationId: orgContext.organizationId,
+      unitId: orgContext.unitId,
+      operatingMode: orgContext.operatingMode,
     };
     setSptList((prev) => [newSpt, ...prev]);
     logAudit("CREATE", "SPT", newSpt.taxType, `Membuat Konsep ${newSpt.taxType} periode ${newSpt.taxPeriod} sebesar Rp ${newSpt.totalTax.toLocaleString("id-ID")}`);
@@ -420,29 +1098,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       type: "info",
       title: "Status SPT Diperbarui",
       description: `${target?.taxType} sekarang berstatus: ${status}`,
-    });
-  };
-
-  const recordPayment = (id: string, ntpn: string, channel: string) => {
-    setPayments((prev) =>
-      prev.map((p) =>
-        p.id === id
-          ? {
-              ...p,
-              status: "PAID",
-              ntpn,
-              paymentChannel: channel,
-              paymentDate: new Date().toISOString().split("T")[0],
-            }
-          : p
-      )
-    );
-    const target = payments.find((p) => p.id === id);
-    logAudit("PAYMENT", "PEMBAYARAN", target?.billingCode || id, `Penyetoran pajak lunas dengan NTPN ${ntpn}`);
-    showToast({
-      type: "success",
-      title: "Penyetoran Pajak Berhasil Divalidasi",
-      description: `Billing ${target?.billingCode} telah lunas dengan NTPN: ${ntpn}`,
     });
   };
 
@@ -483,7 +1138,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setAvailableUsers((prev) => [...prev, newMitraUser]);
 
-    // Register into master vendors if not already present
     const newVendor: Vendor = {
       id: "v-mitra-" + Date.now(),
       name: mitraData.companyName,
@@ -629,7 +1283,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const id = "ret-" + Date.now();
     const newRet: InvoiceReturn = { ...retData, id };
     setInvoiceReturns((prev) => [newRet, ...prev]);
-    logAudit("CREATE", "EFAKTUR", newRet.returnNumber, `Merekam nota retur ${newRet.type} nomor ${newRet.returnNumber}`);
+    logAudit("CREATE", "EFAKTUR", newRet.returnNumber, `Merekam nota retur ${newRet.type} nomor ${newRet.returnNumber} terkait faktur ${newRet.originalInvoiceNumber}`);
     showToast({
       type: "success",
       title: "Nota Retur Berhasil Direkam",
@@ -682,8 +1336,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         availableUsers,
         addUser,
         addMitra,
+        orgContext,
+        switchUnit,
+        toggleOperatingMode,
+        setPeriod,
         selectedPeriod,
         setSelectedPeriod,
+        hasPermission: checkPermission,
         isCompactMode,
         setIsCompactMode,
         isDarkMode,
@@ -697,6 +1356,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         bupotList,
         sptList,
         payments,
+        journals,
         auditLogs,
         notifications,
         vendors,
@@ -718,6 +1378,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addInvoice,
         addBupot,
         addSpt,
+        postSpt,
+        finalizeSpt,
         updateSptStatus,
         recordPayment,
         addPayment,
@@ -727,6 +1389,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateSchoolProfile,
         markAllNotificationsRead,
         clearCacheAndReset,
+        reconcileRecords,
+        practicumBatches,
+        practicumAssignments,
+        practicumSubmissions,
+        addPracticumAssignment,
+        submitPracticum,
+        gradePracticumSubmission,
+        archivedDocs,
+        archiveDocument,
         toasts,
         showToast,
         dismissToast,

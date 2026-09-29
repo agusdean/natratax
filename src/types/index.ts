@@ -6,7 +6,32 @@ export type UserRole =
   | 'VERIFIKATOR'
   | 'OPERATOR'
   | 'AUDITOR'
+  | 'INSTRUCTOR'
+  | 'STUDENT'
   | 'MITRA';
+
+export type Permission = 
+  | 'transaction.create'
+  | 'transaction.edit'
+  | 'transaction.submit'
+  | 'transaction.approve'
+  | 'invoice.create'
+  | 'invoice.issue'
+  | 'invoice.cancel'
+  | 'bupot.create'
+  | 'bupot.issue'
+  | 'spt.create'
+  | 'spt.post'
+  | 'spt.finalize'
+  | 'payment.create'
+  | 'payment.verify'
+  | 'report.view'
+  | 'report.export'
+  | 'audit.view'
+  | 'practicum.manage'
+  | 'practicum.grade'
+  | 'user.manage'
+  | 'role.manage';
 
 export interface User {
   id: string;
@@ -20,14 +45,46 @@ export interface User {
   partnerCompany?: string;
   partnerCategory?: string;
   partnerPhone?: string;
+  batchId?: string; // For Practicum Students
 }
 
 export type TaxType = 'PPN' | 'PPH21' | 'PPH22' | 'PPH23' | 'PPH4_2';
+
+export interface TaxObject {
+  code: string;
+  name: string;
+  taxType: TaxType;
+  defaultRate: number;
+  description: string;
+  isExemptBelowThreshold?: boolean;
+  thresholdAmount?: number;
+}
+
+export interface OrganizationContext {
+  tenantId: string;
+  organizationId: string;
+  organizationName: string;
+  unitId: string;
+  unitName: string;
+  periodMonth: number;
+  periodYear: number;
+  periodLabel: string;
+  fiscalYear: string;
+  operatingMode: 'LIVE_INTERNAL' | 'PRACTICUM_SANDBOX';
+}
+
+export interface UnitOption {
+  id: string;
+  name: string;
+  code: string;
+  description: string;
+}
 
 export interface TaxRule {
   id: string;
   code: string;
   taxType: TaxType;
+  taxObjectCode?: string;
   name: string;
   ratePercentage: number;
   effectiveFrom: string;
@@ -35,6 +92,8 @@ export interface TaxRule {
   description: string;
   isGovernmentStandard: boolean;
   version: string;
+  formula?: string;
+  status?: 'ACTIVE' | 'INACTIVE' | 'EXPIRED';
 }
 
 export type TransactionStatus = 
@@ -64,6 +123,13 @@ export interface Transaction {
   status: TransactionStatus;
   createdBy: string;
   attachmentsCount: number;
+  organizationId?: string;
+  unitId?: string;
+  periodId?: string;
+  taxObjectCode?: string;
+  linkedDocumentId?: string;
+  linkedDocumentType?: 'INVOICE' | 'BUPOT';
+  operatingMode?: 'LIVE_INTERNAL' | 'PRACTICUM_SANDBOX';
 }
 
 export type InvoiceStatus = 'DRAFT' | 'TERBIT' | 'RETUR' | 'DIBATALKAN';
@@ -83,6 +149,11 @@ export interface Invoice {
   status: InvoiceStatus;
   createdBy: string;
   period: string; // e.g. "09-2026"
+  isCreditable?: boolean;
+  sourceTransactionId?: string;
+  organizationId?: string;
+  unitId?: string;
+  operatingMode?: 'LIVE_INTERNAL' | 'PRACTICUM_SANDBOX';
 }
 
 export type BupotType = 'BP21' | 'BPPU' | 'BPNR' | 'BP4_2' | 'BP_A1' | 'BP_A2';
@@ -105,16 +176,35 @@ export interface WithholdingSlip {
   status: BupotStatus;
   dateCreated: string;
   createdBy: string;
+  sourceTransactionId?: string;
+  signatureVerified?: boolean;
+  signerName?: string;
+  signerNpwp?: string;
+  organizationId?: string;
+  unitId?: string;
+  operatingMode?: 'LIVE_INTERNAL' | 'PRACTICUM_SANDBOX';
 }
 
 export type SptStatus = 
   | 'KONSEP'
+  | 'DRAFT'
+  | 'POSTED'
+  | 'VALIDATING'
   | 'MENUNGGU_VERIFIKASI'
+  | 'REVISION_REQUIRED'
+  | 'READY_TO_FINALIZE'
+  | 'SIGNING'
   | 'MENUNGGU_PEMBAYARAN'
+  | 'PAYMENT_REQUIRED'
+  | 'READY_TO_REPORT'
   | 'SIAP_PROSES'
+  | 'FINALIZED'
+  | 'INTERNAL_REPORTED'
   | 'DILAPORKAN'
+  | 'LOCKED'
   | 'DITOLAK'
-  | 'DIBATALKAN';
+  | 'DIBATALKAN'
+  | 'CANCELLED';
 
 export interface SptRecord {
   id: string;
@@ -130,6 +220,18 @@ export interface SptRecord {
   createdBy: string;
   billingCode?: string;
   ntpn?: string;
+  organizationId?: string;
+  unitId?: string;
+  sourceInvoiceIds?: string[];
+  sourceBupotIds?: string[];
+  sourceTransactionIds?: string[];
+  taxOutput?: number;
+  creditableInput?: number;
+  taxPosition?: 'KURANG_BAYAR' | 'NIHIL' | 'LEBIH_BAYAR';
+  finalizedAt?: string;
+  finalizedBy?: string;
+  snapshotData?: string;
+  operatingMode?: 'LIVE_INTERNAL' | 'PRACTICUM_SANDBOX';
 }
 
 export type PaymentStatus = 'PENDING' | 'PAID' | 'LATE' | 'VERIFIED' | 'CANCELLED';
@@ -310,4 +412,72 @@ export interface GrossRevenueRecord {
   isPaid: boolean;
   notes?: string;
 }
+
+export type ReconciliationStatus = 'MATCHED' | 'NEEDS_REVIEW' | 'MISMATCH' | 'UNRESOLVED';
+
+export interface ReconciliationItem {
+  id: string;
+  entityType: 'TRANSACTION' | 'TAX_DOCUMENT' | 'SPT' | 'PAYMENT' | 'LEDGER';
+  referenceNumber: string;
+  date: string;
+  period: string;
+  sourceAmount: number;
+  matchedAmount: number;
+  difference: number;
+  status: ReconciliationStatus;
+  discrepancyType?: 'MISSING_RECORD' | 'DUPLICATE_RECORD' | 'AMOUNT_MISMATCH' | 'DATE_MISMATCH' | 'PAYMENT_MISMATCH';
+  notes: string;
+}
+
+export interface PracticumBatch {
+  id: string;
+  name: string;
+  instructorId: string;
+  instructorName: string;
+  startDate: string;
+  endDate: string;
+  participantLimit: number;
+  status: 'ACTIVE' | 'UPCOMING' | 'COMPLETED';
+  participantsCount: number;
+}
+
+export interface PracticumAssignment {
+  id: string;
+  batchId: string;
+  title: string;
+  description: string;
+  dueDate: string;
+  maxScore: number;
+  instructions: string;
+  status: 'OPEN' | 'CLOSED';
+  createdAt: string;
+}
+
+export interface PracticumSubmission {
+  id: string;
+  assignmentId: string;
+  studentId: string;
+  studentName: string;
+  submissionDate: string;
+  status: 'SUBMITTED' | 'UNDER_REVIEW' | 'GRADED';
+  score?: number;
+  feedback?: string;
+  notes?: string;
+  submittedRecordsCount?: number;
+}
+
+export interface ArchivedDocument {
+  id: string;
+  title: string;
+  category: 'INVOICE' | 'BUPOT' | 'SPT' | 'PAYMENT' | 'EVIDENCE' | 'ASSIGNMENT' | 'REPORT';
+  referenceNumber: string;
+  fileUrl?: string;
+  fileSize: string;
+  fileType: string;
+  version: number;
+  uploadedBy: string;
+  uploadedAt: string;
+  isArchived: boolean;
+}
+
 

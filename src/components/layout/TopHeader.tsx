@@ -33,7 +33,10 @@ export const TopHeader: React.FC = () => {
     clearCacheAndReset,
     isDarkMode, 
     toggleDarkMode, 
-    setIsCommandPaletteOpen 
+    setIsCommandPaletteOpen,
+    orgContext,
+    switchUnit,
+    toggleOperatingMode
   } = useApp();
 
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -242,38 +245,85 @@ export const TopHeader: React.FC = () => {
                   <p className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 mt-0.5">{currentUser.schoolName}</p>
                 </div>
 
-                {availableUsers.length > 1 && (
-                  <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800">
-                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                      <UserCheck className="w-3.5 h-3.5 text-amber-500" />
-                      Pengguna Terdaftar
+                {/* Organization & Unit Switcher (Point 3) */}
+                <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                      <Building2 className="w-3 h-3 text-indigo-500" />
+                      Unit Organisasi Aktif
                     </p>
-                    <div className="grid grid-cols-1 gap-1 max-h-44 overflow-y-auto">
-                      {availableUsers.map((u) => (
-                        <button
-                          key={u.id}
-                          onClick={() => {
-                            switchRole(u.role as UserRole);
-                            setIsUserMenuOpen(false);
-                          }}
-                          className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs flex items-center justify-between transition-colors ${
-                            currentUser.role === u.role
-                              ? "bg-amber-50 dark:bg-amber-950/60 font-bold text-amber-900 dark:text-amber-200 ring-1 ring-amber-300"
-                              : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300"
-                          }`}
-                        >
-                          <div>
-                            <div className="font-bold">{u.name}</div>
-                            <div className="text-[10px] text-slate-400 font-normal">{u.role} • {u.taxId}</div>
-                          </div>
-                          {currentUser.role === u.role && (
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                          )}
-                        </button>
-                      ))}
-                    </div>
+                    <button
+                      onClick={toggleOperatingMode}
+                      className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                        orgContext.operatingMode === "PRACTICUM_SANDBOX"
+                          ? "bg-amber-100 text-amber-900 border border-amber-300"
+                          : "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                      }`}
+                    >
+                      {orgContext.operatingMode === "PRACTICUM_SANDBOX" ? "Sandbox" : "Live"}
+                    </button>
                   </div>
-                )}
+                  <div className="space-y-1">
+                    {[
+                      { id: "UNIT-FIN-01", name: "Keuangan & Perpajakan BOS" },
+                      { id: "UNIT-TEFA-02", name: "Unit Produksi & TEFA" },
+                      { id: "UNIT-YYS-03", name: "Yayasan & Sarana Sekolah" },
+                      { id: "UNIT-LAB-04", name: "Laboratorium & Bengkel" },
+                    ].map((u) => (
+                      <button
+                        key={u.id}
+                        onClick={() => switchUnit(u.id)}
+                        className={`w-full text-left px-2 py-1 rounded text-[11px] flex items-center justify-between transition-colors ${
+                          orgContext.unitId === u.id
+                            ? "bg-indigo-50 dark:bg-indigo-950/70 font-bold text-indigo-900 dark:text-indigo-200"
+                            : "hover:bg-slate-50 dark:hover:bg-slate-800/60 text-slate-600 dark:text-slate-400"
+                        }`}
+                      >
+                        <span className="truncate">{u.name}</span>
+                        {orgContext.unitId === u.id && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-indigo-600" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* RBAC Role Switcher (Point 22) */}
+                <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800">
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                    <UserCheck className="w-3 h-3 text-amber-500" />
+                    Beralih Peran (RBAC)
+                  </p>
+                  <div className="grid grid-cols-2 gap-1 max-h-36 overflow-y-auto">
+                    {[
+                      "SUPER ADMIN",
+                      "KEPALA SEKOLAH",
+                      "BENDAHARA",
+                      "ADMIN PAJAK",
+                      "VERIFIKATOR",
+                      "OPERATOR",
+                      "AUDITOR",
+                      "INSTRUCTOR",
+                      "STUDENT",
+                      "MITRA",
+                    ].map((role) => (
+                      <button
+                        key={role}
+                        onClick={() => {
+                          switchRole(role as UserRole);
+                          setIsUserMenuOpen(false);
+                        }}
+                        className={`px-2 py-1 rounded text-[10px] text-left truncate font-semibold transition-colors ${
+                          currentUser.role === role
+                            ? "bg-amber-100 dark:bg-amber-950 font-bold text-amber-950 dark:text-amber-200 border border-amber-300"
+                            : "bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300"
+                        }`}
+                      >
+                        {role === "INSTRUCTOR" ? "Instruktur" : role === "STUDENT" ? "Siswa" : role}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
                 <div className="py-1">
                   <Link

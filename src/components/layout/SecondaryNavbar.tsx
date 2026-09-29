@@ -203,6 +203,7 @@ export const SecondaryNavbar: React.FC = () => {
         {
           title: "Layanan Edukasi Perpajakan",
           items: [
+            { label: "Modul Praktikum & Lab Pajak Siswa", href: "/practicum", badge: "Vokasi" },
             { label: "Jadwal Kegiatan Edukasi", href: "/layanan/jadwal-edukasi" },
             { label: "Materi Edukasi Umum", href: "/layanan/edukasi-umum" },
             { label: "Materi Edukasi Khusus", href: "/layanan/edukasi-khusus" },

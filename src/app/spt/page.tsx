@@ -28,6 +28,7 @@ function KonsepSptPageContent() {
   const { 
     sptList, 
     updateSptStatus, 
+    finalizeSpt,
     isCompactMode, 
     setIsCompactMode, 
     showToast 
@@ -77,12 +78,43 @@ function KonsepSptPageContent() {
   };
 
   const handleVerifySpt = (id: string, currentStatus: string) => {
-    if (currentStatus === "KONSEP") {
-      updateSptStatus(id, "MENUNGGU_VERIFIKASI");
-    } else if (currentStatus === "MENUNGGU_VERIFIKASI") {
-      updateSptStatus(id, "SIAP_PROSES");
-    } else if (currentStatus === "SIAP_PROSES") {
-      updateSptStatus(id, "DILAPORKAN");
+    const target = sptList.find((s) => s.id === id);
+    if (!target) return;
+
+    if (currentStatus === "FINALIZED" || currentStatus === "DILAPORKAN" || currentStatus === "LOCKED") {
+      showToast({
+        type: "info",
+        title: "Dokumen Terkunci",
+        description: "SPT Masa ini telah difinalisasi secara permanen dan telah diarsipkan.",
+      });
+      return;
+    }
+
+    if (currentStatus === "KONSEP" || currentStatus === "DRAFT") {
+      updateSptStatus(id, "VALIDATING");
+      showToast({
+        type: "info",
+        title: "Validasi Dokumen Sumber",
+        description: "Memeriksa kelengkapan faktur dan bukti potong terkait.",
+      });
+    } else if (currentStatus === "VALIDATING" || currentStatus === "MENUNGGU_VERIFIKASI") {
+      if (target.taxPosition === "KURANG_BAYAR" && !target.ntpn) {
+        updateSptStatus(id, "PAYMENT_REQUIRED");
+      } else {
+        updateSptStatus(id, "READY_TO_FINALIZE");
+      }
+    } else if (currentStatus === "PAYMENT_REQUIRED" || currentStatus === "MENUNGGU_PEMBAYARAN") {
+      if (!target.ntpn) {
+        showToast({
+          type: "warning",
+          title: "Penyetoran Kas Negara Diperlukan",
+          description: `Harap lakukan validasi penyetoran billing ${target.billingCode || "pajak"} di menu Pembayaran terlebih dahulu.`,
+        });
+        return;
+      }
+      finalizeSpt(id);
+    } else if (currentStatus === "READY_TO_FINALIZE" || currentStatus === "SIAP_PROSES") {
+      finalizeSpt(id);
     }
   };
 

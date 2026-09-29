@@ -11,6 +11,7 @@ import { AiAssistantDrawer } from "@/components/features/AiAssistantDrawer";
 import { ChevronRight, Home } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useApp } from "@/context/AppContext";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -19,6 +20,8 @@ interface AppShellProps {
 
 export const AppShell: React.FC<AppShellProps> = ({ children, breadcrumbs }) => {
   const pathname = usePathname();
+  const { orgContext, toggleOperatingMode } = useApp();
+
 
   // Generate dynamic breadcrumbs if none provided
   const getBreadcrumbs = () => {
@@ -114,6 +117,50 @@ export const AppShell: React.FC<AppShellProps> = ({ children, breadcrumbs }) => 
             </React.Fragment>
           ))}
         </nav>
+
+        {/* Persistent Active Organization & Unit Context Banner (Point 3 & 28) */}
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2 mb-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 text-xs shadow-2xs">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-100">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>{orgContext.organizationName}</span>
+            </div>
+            <span className="text-slate-300 dark:text-slate-700 hidden sm:inline">•</span>
+            <div className="flex items-center gap-1 text-slate-600 dark:text-slate-300">
+              <span className="text-slate-400 dark:text-slate-500">Unit:</span>
+              <span className="font-semibold text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded border border-indigo-100 dark:border-indigo-900/50">
+                {orgContext.unitName}
+              </span>
+            </div>
+            <span className="text-slate-300 dark:text-slate-700 hidden sm:inline">•</span>
+            <div className="flex items-center gap-1 text-slate-600 dark:text-slate-300">
+              <span className="text-slate-400 dark:text-slate-500">Masa Pajak:</span>
+              <span className="font-semibold text-slate-700 dark:text-slate-200">
+                {orgContext.periodLabel}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {orgContext.operatingMode === "PRACTICUM_SANDBOX" ? (
+              <button
+                onClick={toggleOperatingMode}
+                title="Klik untuk kembali ke Mode Operasional Nyata"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-black uppercase tracking-wider bg-amber-500 hover:bg-amber-600 text-white shadow-xs transition-colors"
+              >
+                <span>PRACTICUM MODE (SANDBOX)</span>
+              </button>
+            ) : (
+              <button
+                onClick={toggleOperatingMode}
+                title="Klik untuk beralih ke Mode Praktikum Siswa"
+                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors"
+              >
+                <span>LIVE INTERNAL</span>
+              </button>
+            )}
+          </div>
+        </div>
 
         {/* Content Layout: Left Sidebar + Main View */}
         <div className="flex flex-col lg:flex-row gap-6">

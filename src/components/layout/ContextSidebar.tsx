@@ -82,6 +82,26 @@ const ContextSidebarContent: React.FC = () => {
       };
     }
 
+    // Practicum & Instructor Dedicated Mode View
+    if (pathname.startsWith("/practicum") || currentUser.role === "INSTRUCTOR" || currentUser.role === "STUDENT") {
+      return {
+        groupTitle: "Instruktur & Praktikum Vokasi",
+        sections: [
+          {
+            title: "Laboratorium Pajak",
+            items: [
+              { label: "Dasbor Praktikum", href: "/practicum", icon: LayoutDashboard },
+              { label: "Faktur Latihan (Sandbox)", href: "/invoices/outgoing", icon: FileText },
+              { label: "Bukti Potong Latihan", href: "/bupot", icon: FileCheck2 },
+              { label: "Simulasi SPT Masa", href: "/spt", icon: Files },
+              { label: "Rekonsiliasi Pajak", href: "/ledger#rekon", icon: Scale },
+              { label: "Dokumen Arsip", href: "/portal/documents", icon: FolderOpen },
+            ],
+          },
+        ],
+      };
+    }
+
     // Screenshot 1: e-Faktur Sidebar exactly matching Faktur & Dokumen Lain
     if (pathname.startsWith("/invoices")) {
       return {

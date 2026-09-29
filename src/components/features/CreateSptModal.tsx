@@ -11,7 +11,7 @@ interface CreateSptModalProps {
 }
 
 export const CreateSptModal: React.FC<CreateSptModalProps> = ({ isOpen, onClose }) => {
-  const { addSpt } = useApp();
+  const { addSpt, postSpt } = useApp();
 
   const [taxType, setTaxType] = useState("SPT Masa Unifikasi");
   const [sptCategory, setSptCategory] = useState<"MASA" | "TAHUNAN" | "PEMBETULAN">("MASA");
@@ -73,6 +73,30 @@ export const CreateSptModal: React.FC<CreateSptModalProps> = ({ isOpen, onClose 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs">
           
+          {/* PrakTax Master Lineage: Auto-Aggregate Button */}
+          <div className="p-3.5 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/60 flex items-center justify-between gap-3">
+            <div>
+              <span className="font-extrabold text-xs text-[#381750] dark:text-purple-300 block">
+                Posting Otomatis Dokumen Sumber
+              </span>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                Agregasi instan seluruh Faktur Keluaran, Masukan, dan Bukti Potong terbit periode berjalan.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const targetType = taxType.includes("PPN") ? "PPN" : taxType.includes("21") ? "PPH21" : "UNIFIKASI";
+                postSpt(targetType, periodMonth, periodYear);
+                onClose();
+              }}
+              className="shrink-0 px-3 py-2 rounded-lg bg-[#381750] hover:bg-[#4a1f6a] text-white font-bold text-xs shadow-xs flex items-center gap-1.5 transition-colors"
+            >
+              <Files className="w-3.5 h-3.5" />
+              <span>POST SPT</span>
+            </button>
+          </div>
+
           <div>
             <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
               Jenis Formulir Pajak

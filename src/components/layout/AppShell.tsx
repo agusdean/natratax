@@ -16,11 +16,14 @@ import { useApp } from "@/context/AppContext";
 interface AppShellProps {
   children: React.ReactNode;
   breadcrumbs?: { label: string; href?: string }[];
+  hideSidebar?: boolean;
 }
 
-export const AppShell: React.FC<AppShellProps> = ({ children, breadcrumbs }) => {
+export const AppShell: React.FC<AppShellProps> = ({ children, breadcrumbs, hideSidebar }) => {
   const pathname = usePathname();
   const { orgContext, toggleOperatingMode } = useApp();
+  const shouldHideSidebar = hideSidebar !== undefined ? hideSidebar : pathname === "/dashboard";
+
 
 
   // Generate dynamic breadcrumbs if none provided
@@ -162,17 +165,25 @@ export const AppShell: React.FC<AppShellProps> = ({ children, breadcrumbs }) => 
           </div>
         </div>
 
-        {/* Content Layout: Left Sidebar + Main View */}
-        <div className="flex flex-col lg:flex-row gap-6">
-          <React.Suspense fallback={<aside className="w-64 lg:w-72 shrink-0 animate-pulse bg-slate-100 dark:bg-slate-800 rounded-xl h-96" />}>
-            <ContextSidebar />
-          </React.Suspense>
-          <main className="flex-1 min-w-0">
+        {/* Content Layout: Left Sidebar + Main View (or Full Width on Dashboard) */}
+        {shouldHideSidebar ? (
+          <main className="w-full min-w-0">
             <React.Suspense fallback={<div className="animate-pulse bg-slate-100 dark:bg-slate-800 rounded-xl h-96" />}>
               {children}
             </React.Suspense>
           </main>
-        </div>
+        ) : (
+          <div className="flex flex-col lg:flex-row gap-6">
+            <React.Suspense fallback={<aside className="w-64 lg:w-72 shrink-0 animate-pulse bg-slate-100 dark:bg-slate-800 rounded-xl h-96" />}>
+              <ContextSidebar />
+            </React.Suspense>
+            <main className="flex-1 min-w-0">
+              <React.Suspense fallback={<div className="animate-pulse bg-slate-100 dark:bg-slate-800 rounded-xl h-96" />}>
+                {children}
+              </React.Suspense>
+            </main>
+          </div>
+        )}
 
       </div>
 

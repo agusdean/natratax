@@ -88,7 +88,7 @@ export const TopHeader: React.FC = () => {
               </span>
             </div>
             <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-              Versi 1.0
+              Versi 2.0
             </span>
           </Link>
 

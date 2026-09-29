@@ -52,6 +52,15 @@ interface AppContextType {
   switchRole: (role: UserRole) => void;
   availableUsers: User[];
   addUser: (user: Omit<User, "id">) => void;
+  addMitra: (mitraData: {
+    companyName: string;
+    picName: string;
+    npwp: string;
+    category: string;
+    email: string;
+    phone: string;
+    address?: string;
+  }) => User;
   
   // Period filter
   selectedPeriod: string;
@@ -221,7 +230,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const switchRole = (role: UserRole) => {
-    const found = availableUsers.find((u) => u.role === role) || DEMO_USERS[0];
+    let found = availableUsers.find((u) => u.role === role);
+    if (!found && role === "MITRA") {
+      found = {
+        id: "usr-mitra-demo",
+        name: "Ir. Hendra Kusuma - PT MITRA INDUSTRI KARYA",
+        email: "kemitraan@mitra-industri.co.id",
+        role: "MITRA",
+        taxId: "01.234.567.8-012.000",
+        schoolName: "SMK BINA PUTRA JAKARTA (MITRA REKANAN)",
+        department: "Mitra Industri (DU/DI) & Vokasi",
+        partnerCompany: "PT Mitra Industri Karya",
+        partnerCategory: "Mitra DU/DI (Super Tax Deduction 200%)",
+        partnerPhone: "081298765432",
+      };
+      setAvailableUsers((prev) => [...prev, found!]);
+    } else if (!found) {
+      found = DEMO_USERS[0];
+    }
+
     setCurrentUser(found);
     try {
       localStorage.setItem("natratax_user", JSON.stringify(found));
@@ -431,6 +458,63 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
+  const addMitra = (mitraData: {
+    companyName: string;
+    picName: string;
+    npwp: string;
+    category: string;
+    email: string;
+    phone: string;
+    address?: string;
+  }): User => {
+    const id = "usr-mitra-" + Date.now();
+    const newMitraUser: User = {
+      id,
+      name: `${mitraData.picName} - ${mitraData.companyName}`,
+      email: mitraData.email,
+      role: "MITRA",
+      taxId: mitraData.npwp,
+      schoolName: "SMK BINA PUTRA JAKARTA (MITRA REKANAN)",
+      department: mitraData.category,
+      partnerCompany: mitraData.companyName,
+      partnerCategory: mitraData.category,
+      partnerPhone: mitraData.phone,
+    };
+
+    setAvailableUsers((prev) => [...prev, newMitraUser]);
+
+    // Register into master vendors if not already present
+    const newVendor: Vendor = {
+      id: "v-mitra-" + Date.now(),
+      name: mitraData.companyName,
+      npwp: mitraData.npwp,
+      type: "KEMITRAAN DU/DI",
+      category: mitraData.category,
+      bankAccount: "Bank DKI - 102.20." + Math.floor(10000 + Math.random() * 90000),
+      city: "Jakarta Timur",
+      status: "TERDAFTAR RESMI",
+      phone: mitraData.phone,
+      address: mitraData.address || "DKI Jakarta",
+    };
+    setVendors((prev) => [newVendor, ...prev]);
+
+    logAudit("CREATE", "MITRA", newMitraUser.taxId, `Pendaftaran mitra baru: ${mitraData.companyName} (${mitraData.category})`);
+    showToast({
+      type: "success",
+      title: "Pendaftaran Mitra Berhasil",
+      description: `Kemitraan ${mitraData.companyName} terverifikasi aktif. Selamat datang di Portal Mitra!`,
+    });
+
+    setCurrentUser(newMitraUser);
+    try {
+      localStorage.setItem("natratax_user", JSON.stringify(newMitraUser));
+    } catch {
+      // ignore
+    }
+
+    return newMitraUser;
+  };
+
   const addPayment = (paymentData: Omit<PaymentRecord, "id">) => {
     const id = "pay-" + Date.now();
     const newPayment: PaymentRecord = { ...paymentData, id };
@@ -597,6 +681,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         switchRole,
         availableUsers,
         addUser,
+        addMitra,
         selectedPeriod,
         setSelectedPeriod,
         isCompactMode,

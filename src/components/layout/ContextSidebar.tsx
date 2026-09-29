@@ -62,6 +62,26 @@ const ContextSidebarContent: React.FC = () => {
 
   // Determine current active module from route
   const getSubmenuConfig = (): { groupTitle: string; sections: SubmenuSection[] } => {
+    // MITRA Role Dedicated Portal View
+    if (currentUser.role === "MITRA" && (pathname === "/dashboard" || pathname.startsWith("/portal/mitra"))) {
+      return {
+        groupTitle: "Portal Kemitraan & Rekanan",
+        sections: [
+          {
+            title: "Layanan Kemitraan",
+            items: [
+              { label: "Dasbor Kemitraan", href: "/dashboard", icon: LayoutDashboard },
+              { label: "Faktur Kemitraan / DU-DI", href: "/invoices/outgoing", icon: FileText },
+              { label: "Bukti Potong Pajak Saya", href: "/bupot", icon: FileCheck2 },
+              { label: "Insentif Super Tax Vokasi 200%", href: "/layanan/fasilitas-saya", icon: Sparkles },
+              { label: "Rekonsiliasi Rekanan BOS", href: "/ledger#rekon", icon: Scale },
+              { label: "Dokumen Perjanjian Kerjasama", href: "/portal/documents", icon: FolderOpen },
+            ],
+          },
+        ],
+      };
+    }
+
     // Screenshot 1: e-Faktur Sidebar exactly matching Faktur & Dokumen Lain
     if (pathname.startsWith("/invoices")) {
       return {

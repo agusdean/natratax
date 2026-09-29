@@ -241,6 +241,7 @@ export default function UsersManagementPage() {
                     <option value="VERIFIKATOR">VERIFIKATOR (SPI)</option>
                     <option value="OPERATOR">OPERATOR BOS</option>
                     <option value="AUDITOR">AUDITOR</option>
+                    <option value="MITRA">MITRA REKANAN / DU-DI</option>
                     <option value="SUPER ADMIN">SUPER ADMIN</option>
                   </select>
                 </div>

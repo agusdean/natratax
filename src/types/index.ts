@@ -5,7 +5,8 @@ export type UserRole =
   | 'ADMIN PAJAK'
   | 'VERIFIKATOR'
   | 'OPERATOR'
-  | 'AUDITOR';
+  | 'AUDITOR'
+  | 'MITRA';
 
 export interface User {
   id: string;
@@ -16,6 +17,9 @@ export interface User {
   schoolName: string;
   avatarUrl?: string;
   department: string;
+  partnerCompany?: string;
+  partnerCategory?: string;
+  partnerPhone?: string;
 }
 
 export type TaxType = 'PPN' | 'PPH21' | 'PPH22' | 'PPH23' | 'PPH4_2';
